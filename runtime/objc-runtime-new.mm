@@ -6340,6 +6340,8 @@ findMethodInSortedMethodList(SEL key, const method_list_t *list, const getNameFu
     uintptr_t keyValue = (uintptr_t)key;
     uint32_t count;
 
+    //步骤19:
+    //排好序的用二分查找，效率更高
     for (count = list->count; count != 0; count >>= 1) {
         probe = base + (count >> 1);
 
@@ -6423,9 +6425,11 @@ search_method_list_inline(const method_list_t *mlist, SEL sel)
     int methodListHasExpectedSize = mlist->isExpectedSize();
 
     if (fastpath(methodListIsFixedUp && methodListHasExpectedSize)) {
+        //步骤18:如果方法排好序了先去排好序的方法里面找
         return findMethodInSortedMethodList(sel, mlist);
     } else {
-        // Linear search of unsorted method list
+        //步骤20:
+        //没有排好序就线性比较，根据方法名，一个一个比较
         if (auto *m = findMethodInUnsortedMethodList(sel, mlist))
             return m;
     }
@@ -6557,6 +6561,7 @@ getMethodNoSuper_nolock(Class cls, SEL sel)
         // caller of search_method_list, inlining it turns
         // getMethodNoSuper_nolock into a frame-less function and eliminates
         // any store from this codepath.
+        //步骤17:搜索
         method_t *m = search_method_list_inline(*mlists, sel);
         if (m) return m;
     }
@@ -6833,6 +6838,8 @@ static IMP _lookUpImpTryCache(id inst, SEL sel, Class cls, int behavior)
         return lookUpImpOrForward(inst, sel, cls, behavior);
     }
 
+    //步骤15:
+    //再找一次缓存，怕你动态添加了一些方法
     IMP imp = cache_getImp(cls, sel);
     if (imp != NULL) goto done;
 #if CONFIG_USE_PREOPT_CACHES
@@ -6918,15 +6925,19 @@ IMP lookUpImpOrForward(id inst, SEL sel, Class cls, int behavior)
     // The only codepath calling into this without having performed some
     // kind of cache lookup is class_getInstanceMethod().
 
+   //步骤25:如果自己类对象里面没找到方法
     for (unsigned attempts = unreasonableClassCount();;) {
         if (curClass->cache.isConstantOptimizedCache(/* strict */true)) {
 #if CONFIG_USE_PREOPT_CACHES
+            //步骤15:
+            //再找一次缓存，怕你动态添加了一些方法
             imp = cache_getImp(curClass, sel);
             if (imp) goto done_unlock;
             curClass = curClass->cache.preoptFallbackClass();
 #endif
         } else {
-            // curClass method list.
+            //步骤16:
+            //将类对象/元类对象和方法名放进去
             method_t *meth = getMethodNoSuper_nolock(curClass, sel);
             if (meth) {
                 imp = meth->imp(false);
@@ -6974,6 +6985,7 @@ IMP lookUpImpOrForward(id inst, SEL sel, Class cls, int behavior)
             cls = cls->cache.preoptFallbackClass();
         }
 #endif
+        //步骤21:如果找到这个方法，就填充缓存
         log_and_fill_cache(cls, imp, sel, inst, curClass);
     }
 #if CONFIG_USE_PREOPT_CACHES

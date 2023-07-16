@@ -333,6 +333,7 @@ LExit$0:
 .endif
 .endmacro
 
+//步骤4:
 .macro CacheLookup Mode, Function, MissLabelDynamic, MissLabelConstant
 	//
 	// Restart protocol:
@@ -363,7 +364,7 @@ LLookupStart\Function:
 	ldr	p10, [x16, #CACHE]				// p10 = mask|buckets
 	lsr	p11, p10, #48			// p11 = mask
 	and	p10, p10, #0xffffffffffff	// p10 = buckets
-	and	w12, w1, w11			// x12 = _cmd & mask
+	and	w12, w1, w11			// 步骤5:根据方法名&mask得到索引，进行查找缓存
 #elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
 	ldr	p11, [x16, #CACHE]			// p11 = mask|buckets
 #if CONFIG_USE_PREOPT_CACHES
@@ -399,7 +400,7 @@ LLookupStart\Function:
 	cmp	p9, p1				//     if (sel != _cmd) {
 	b.ne	3f				//         scan more
 						//     } else {
-2:	CacheHit \Mode				// hit:    call or return imp
+2:	CacheHit \Mode				// 步骤6:如果查找到缓存就返回
 						//     }
 3:	cbz	p9, \MissLabelDynamic		//     if (sel == 0) goto Miss;
 	cmp	p13, p10			// } while (bucket >= buckets)
@@ -572,12 +573,13 @@ _objc_debug_taggedpointer_classes:
 .endmacro
 #endif
 
-	MSG_ENTRY _objc_msgSend
+	MSG_ENTRY _objc_msgSend // 入口点
 	UNWIND _objc_msgSend, NoFrame
 
-	cmp	p0, #0			// nil check and tagged pointer check
+    // 
+	cmp	p0, #0
 #if SUPPORT_TAGGED_POINTERS
-	b.le	LNilOrTagged		//  (MSB tagged pointer looks negative)
+	b.le	LNilOrTagged		//  1. 判断self对象是否为nil和tagged pointer
 #else
 	b.eq	LReturnZero
 #endif
@@ -585,11 +587,11 @@ _objc_debug_taggedpointer_classes:
 	GetClassFromIsa_p16 p14, 1, x0	// p16 = class
 LGetIsaDone:
 	// calls imp or objc_msgSend_uncached
-	CacheLookup NORMAL, _objc_msgSend, __objc_msgSend_uncached
+	CacheLookup NORMAL, _objc_msgSend, __objc_msgSend_uncached // 调用 CacheLookup, 招到缓存调用方法,找不到调用 __objc_msgSend_uncached
 
 #if SUPPORT_TAGGED_POINTERS
 LNilOrTagged:
-	b.eq	LReturnZero		// nil check
+	b.eq	LReturnZero		// 2. self 为 nil 就返回 0
 	GetTaggedClass
 	b	LGetIsaDone
 // SUPPORT_TAGGED_POINTERS
@@ -705,6 +707,9 @@ LMsgLookupSuperResume:
 	// receiver and selector already in x0 and x1
 	mov	x2, x16
 	mov	x3, #3
+//步骤12:
+//跳转调用_lookUpImpOrForward
+//汇编没实现这个方法，所以搜索c语言_lookUpImpOrForward，(汇编的多了一个_）
 	bl	_lookUpImpOrForward
 
 	// IMP in x0
@@ -719,7 +724,7 @@ LMsgLookupSuperResume:
 
 	// THIS IS NOT A CALLABLE C FUNCTION
 	// Out-of-band p15 is the class to search
-	
+//步骤10:调用MethodTableLookup
 	MethodTableLookup
 	TailCallFunctionPointer x17
 

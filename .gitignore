@@ -50,3 +50,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+.DS_Store
+*.xcuserstate
+objc.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.xcworkspacedata
+objc.xcodeproj/xcuserdata/jinbo03.xcuserdatad/xcschemes/xcschememanagement.plist
